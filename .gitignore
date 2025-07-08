@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Testing
+.pytest_cache/
+.coverage
+
+# AI Chatbot specific
+vector_index.faiss
+metadata.pkl
+*.faiss
+*.pkl
+.streamlit/
+models/
+*.model
+logs/
+*.log
+sessions/
+*.session
+
+# OS
+.DS_Store
+Thumbs.db
