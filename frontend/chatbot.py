@@ -3,27 +3,22 @@ import requests
 import uuid
 import time
 
-# --- Indexing Logic ---
-# This block will only run once per session.
 if 'indexed' not in st.session_state:
     st.session_state.indexed = False
-
 if not st.session_state.indexed:
     try:
-        # Show a message while indexing
         with st.spinner('Setting up the knowledge base... Please wait.'):
             response = requests.post(
                 "http://localhost:8000/index/",
-                timeout=30  # Increased timeout for potentially long indexing jobs
+                timeout=30
             )
         
         if response.ok:
             st.session_state.indexed = True
             message = response.json().get("message", "Indexing complete!")
             st.success(message)
-            time.sleep(2) # Give user time to read the success message
+            time.sleep(2)
         else:
-            # If indexing fails, show an error and stop the app
             error_detail = response.json().get("detail", "Unknown error.")
             st.error(f"Failed to initialize knowledge base: {error_detail}")
             st.stop()
@@ -45,8 +40,6 @@ role_avatar = {
 with st.chat_message("assistant", avatar=role_avatar["assistant"]):
     st.write("Hello, I am your AI assistant. How can I help you today?")
 
-# Remove the frontend message history - let backend handle all conversation memory
-# Only keep messages for display purposes in the current session
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -59,7 +52,6 @@ if prompt := st.chat_input("Type your message here..."):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Show spinner while processing
     with st.spinner('Getting response...'):
         try:
             api_response = requests.post(

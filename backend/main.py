@@ -6,7 +6,6 @@ app = FastAPI()
 chatbot = ChatbotManager()
 
 class ChatRequest(BaseModel):
-    role: str
     message: str
     session_id: str
 

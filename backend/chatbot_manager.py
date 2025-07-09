@@ -1,9 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-from langchain_community.llms import Ollama
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationChain
 from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
 
@@ -13,8 +11,6 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 
 load_dotenv()
-# No longer needed for Ollama
-# os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 class ChatbotManager:
     def __init__(self, index_name="faiss_index_chatbot"):
@@ -47,7 +43,6 @@ class ChatbotManager:
             memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
             retriever = self.vectorstore.as_retriever()
             
-            # Custom prompt that handles both conversation and document queries
             qa_prompt = PromptTemplate(
                 template="""You are a helpful AI assistant with broad knowledge. You can have normal conversations, answer general questions, and remember what users tell you. When relevant document context is provided, you can use it to enhance your answers, but you're not limited to only that context.
 
@@ -70,11 +65,8 @@ Assistant:""",
         return self.conversations[session_id]
 
     def chat(self, session_id: str, query: str) -> str:
-        """Handles the chat logic for a session."""
-        chain = self.get_conversation_chain(session_id)
-        
         try:
-            # Use invoke method with correct input key for ConversationalRetrievalChain
+            chain = self.get_conversation_chain(session_id)
             result = chain.invoke({"question": query})
             return result.get("answer", "Sorry, I could not find an answer.")
         except Exception as e:
