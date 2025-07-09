@@ -1,3 +1,4 @@
+from chatbot_manager import retrieve_data_from_vectordb, store_data_to_vectordb
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -13,4 +14,6 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat/")
 def chat(req: ChatRequest):
-    return {"response": f"{req.role} said: {req.message} -backend response"}
+    store_data_to_vectordb(req.message)
+    response = retrieve_data_from_vectordb(req.message, index_name="faiss_index_chatbot")
+    return {"response": f"{response['result']}"}
