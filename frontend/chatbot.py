@@ -1,6 +1,42 @@
 import streamlit as st
 import requests
+import uuid
+import time
+
+# --- Indexing Logic ---
+# This block will only run once per session.
+if 'indexed' not in st.session_state:
+    st.session_state.indexed = False
+
+if not st.session_state.indexed:
+    try:
+        # Show a message while indexing
+        with st.spinner('Setting up the knowledge base... Please wait.'):
+            response = requests.post(
+                "http://localhost:8000/index/",
+                timeout=30  # Increased timeout for potentially long indexing jobs
+            )
+        
+        if response.ok:
+            st.session_state.indexed = True
+            message = response.json().get("message", "Indexing complete!")
+            st.success(message)
+            time.sleep(2) # Give user time to read the success message
+        else:
+            # If indexing fails, show an error and stop the app
+            error_detail = response.json().get("detail", "Unknown error.")
+            st.error(f"Failed to initialize knowledge base: {error_detail}")
+            st.stop()
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Could not connect to the backend to initialize the knowledge base: {e}")
+        st.info("Please make sure the backend server is running.")
+        st.stop()
+
 st.title("GraphBit Chatbot")
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 role_avatar = {
     "assistant": "🦖",
@@ -9,6 +45,8 @@ role_avatar = {
 with st.chat_message("assistant", avatar=role_avatar["assistant"]):
     st.write("Hello, I am your AI assistant. How can I help you today?")
 
+# Remove the frontend message history - let backend handle all conversation memory
+# Only keep messages for display purposes in the current session
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -24,7 +62,11 @@ if prompt := st.chat_input("Type your message here..."):
     try:
         api_response = requests.post(
             "http://localhost:8000/chat/",
-            json={"role": "user", "message": prompt},
+            json={
+                "role": "user", 
+                "message": prompt,
+                "session_id": st.session_state.session_id
+            },
             timeout=10
         )
         if api_response.ok:
@@ -36,6 +78,5 @@ if prompt := st.chat_input("Type your message here..."):
 
     with st.chat_message("assistant", avatar=role_avatar["assistant"]):
         st.markdown(response)
-
     
     st.session_state.messages.append({"role": "assistant", "content": response})

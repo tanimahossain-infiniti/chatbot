@@ -1,54 +1,78 @@
-from langchain_openai import OpenAI
-from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_core.vectorstores import VectorStoreRetriever
-from langchain.chains import RetrievalQA
-
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+from langchain_openai import OpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.document_loaders import TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import ConversationalRetrievalChain
+from langchain.prompts import PromptTemplate
 
+load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-def store_data_to_vectordb(text_content, index_name="faiss_index_chatbot"):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0, length_function=len)
-    docs = text_splitter.create_documents([text_content])
-    
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_documents(docs, embeddings)
-    vectorstore.save_local(index_name)
-    
-    print(f"Data stored successfully in {index_name}")
+class ChatbotManager:
+    def __init__(self, index_name="faiss_index_chatbot"):
+        self.index_name = index_name
+        self.llm = OpenAI(temperature=0.7)
+        self.embeddings = OpenAIEmbeddings()
+        self.conversations = {}
+        self.vectorstore = None
+        # Try to load the existing index
+        if os.path.exists(self.index_name):
+            self.vectorstore = FAISS.load_local(
+                self.index_name, self.embeddings, allow_dangerous_deserialization=True
+            )
 
-def retrieve_data_from_vectordb(query, index_name="faiss_index_chatbot"):
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.load_local(index_name, embeddings, allow_dangerous_deserialization=True)
-    
-    retriever = vectorstore.as_retriever(search_type="similarity")
-    qa = RetrievalQA.from_chain_type(
-        llm=OpenAI(temperature=0),
-        chain_type="stuff",
-        retriever=retriever
-    )
-    
-    results = qa.invoke({"query": query})
-    return results
+    def create_index(self, file_path="data/sample.txt"):
+        loader = TextLoader(file_path, encoding="utf-8")
+        documents = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        docs = text_splitter.split_documents(documents)
+        
+        self.vectorstore = FAISS.from_documents(docs, self.embeddings)
+        self.vectorstore.save_local(self.index_name)
+        print(f"Vector store created and saved as {self.index_name}")
 
-def process_sample_file(query: str = "Marry had a little lamb"):
-    loader = TextLoader("data/sample.txt", encoding="utf-8")
-    documents = loader.load()
-    
-    text_content = documents[0].page_content
-    
-    store_data_to_vectordb(text_content)
-    
-    results = retrieve_data_from_vectordb(query, index_name="faiss_index_chatbot")
-    print(f"Query: {results['query']}")
-    print(f"Answer: {results['result']}")
-    return results
+    def get_conversation_chain(self, session_id):
+        if self.vectorstore is None:
+            raise ValueError("Vector store not initialized. Please create the index first.")
 
-# Example usage:
-process_sample_file()
+        if session_id not in self.conversations:
+            memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+            retriever = self.vectorstore.as_retriever()
+            
+            qa_prompt = PromptTemplate(
+                template="""You are a helpful AI assistant. You can have normal conversations and remember what users tell you. When relevant, you can also use the provided context to answer questions.
+
+Context: {context}
+
+Chat History: {chat_history}
+
+Human: {question}
+Assistant:""",
+                input_variables=["context", "chat_history", "question"]
+            )
+            
+            self.conversations[session_id] = ConversationalRetrievalChain.from_llm(
+                llm=self.llm,
+                retriever=retriever,
+                memory=memory,
+                return_source_documents=False,
+                combine_docs_chain_kwargs={"prompt": qa_prompt}
+            )
+        return self.conversations[session_id]
+
+    def chat(self, session_id: str, query: str) -> str:
+        """Handles the chat logic for a session."""
+        chain = self.get_conversation_chain(session_id)
+        
+        try:
+            # Use invoke method with correct input key for ConversationalRetrievalChain
+            result = chain.invoke({"question": query})
+            return result.get("answer", "Sorry, I could not find an answer.")
+        except Exception as e:
+            return f"Sorry, I encountered an error: {str(e)}"

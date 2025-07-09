@@ -1,19 +1,34 @@
-from chatbot_manager import retrieve_data_from_vectordb, store_data_to_vectordb
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from chatbot_manager import ChatbotManager
 
 app = FastAPI()
-
-@app.get("/")
-def root():
-    return {"message": "Welcome to the FastAPI application!"}
+chatbot = ChatbotManager()
 
 class ChatRequest(BaseModel):
     role: str
     message: str
+    session_id: str
+
+@app.get("/")
+def root():
+    return {"message": "Welcome to the Chatbot API!"}
+
+@app.post("/index/")
+def create_index():
+    """Endpoint to trigger the creation of the vector store index."""
+    try:
+        chatbot.create_index()
+        return {"message": "Vector store index created successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/")
 def chat(req: ChatRequest):
-    store_data_to_vectordb(req.message)
-    response = retrieve_data_from_vectordb(req.message, index_name="faiss_index_chatbot")
-    return {"response": f"{response['result']}"}
+    try:
+        response = chatbot.chat(req.session_id, req.message)
+        return {"response": response}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
