@@ -59,22 +59,24 @@ if prompt := st.chat_input("Type your message here..."):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    try:
-        api_response = requests.post(
-            "http://localhost:8000/chat/",
-            json={
-                "role": "user", 
-                "message": prompt,
-                "session_id": st.session_state.session_id
-            },
-            timeout=10
-        )
-        if api_response.ok:
-            response = api_response.json().get("response", f"Echo: {prompt}")
-        else:
-            response = f"API Error: {api_response.status_code}"
-    except Exception as e:
-        response = f"Request failed: {e}"
+    # Show spinner while processing
+    with st.spinner('Getting response...'):
+        try:
+            api_response = requests.post(
+                "http://localhost:8000/chat/",
+                json={
+                    "role": "user", 
+                    "message": prompt,
+                    "session_id": st.session_state.session_id
+                },
+                timeout=10
+            )
+            if api_response.ok:
+                response = api_response.json().get("response", f"Echo: {prompt}")
+            else:
+                response = f"API Error: {api_response.status_code}"
+        except Exception as e:
+            response = f"Request failed: {e}"
 
     with st.chat_message("assistant", avatar=role_avatar["assistant"]):
         st.markdown(response)

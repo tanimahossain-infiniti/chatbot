@@ -45,10 +45,11 @@ class ChatbotManager:
             memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
             retriever = self.vectorstore.as_retriever()
             
+            # Custom prompt that handles both conversation and document queries
             qa_prompt = PromptTemplate(
-                template="""You are a helpful AI assistant. You can have normal conversations and remember what users tell you. When relevant, you can also use the provided context to answer questions.
+                template="""You are a helpful AI assistant with broad knowledge. You can have normal conversations, answer general questions, and remember what users tell you. When relevant document context is provided, you can use it to enhance your answers, but you're not limited to only that context.
 
-Context: {context}
+Document Context (use if relevant): {context}
 
 Chat History: {chat_history}
 
