@@ -1,27 +1,29 @@
 import os
 from dotenv import load_dotenv
 
-from langchain_openai import OpenAI
+from langchain_community.llms import Ollama
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_ollama import OllamaLLM, OllamaEmbeddings
+
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 
 load_dotenv()
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+# No longer needed for Ollama
+# os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 class ChatbotManager:
     def __init__(self, index_name="faiss_index_chatbot"):
         self.index_name = index_name
-        self.llm = OpenAI(temperature=0.7)
-        self.embeddings = OpenAIEmbeddings()
+        self.llm = OllamaLLM(model="llama3.2")
+        self.embeddings = OllamaEmbeddings(model="llama3.2")
+
         self.conversations = {}
         self.vectorstore = None
-        # Try to load the existing index
         if os.path.exists(self.index_name):
             self.vectorstore = FAISS.load_local(
                 self.index_name, self.embeddings, allow_dangerous_deserialization=True
