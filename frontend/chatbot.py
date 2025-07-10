@@ -31,7 +31,7 @@ if not st.session_state.indexed:
 st.title("GraphBit Chatbot")
 
 if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state.session_id = "default_session-1"
 
 role_avatar = {
     "assistant": "🦖",
@@ -61,7 +61,7 @@ if prompt := st.chat_input("Type your message here..."):
                     "message": prompt,
                     "session_id": st.session_state.session_id
                 },
-                timeout=10
+                timeout=100
             )
             if api_response.ok:
                 response = api_response.json().get("response", f"Echo: {prompt}")
