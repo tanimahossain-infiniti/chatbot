@@ -31,7 +31,7 @@ if not st.session_state.indexed:
 st.title("GraphBit Chatbot")
 
 if "session_id" not in st.session_state:
-    st.session_state.session_id = "default_session-1"
+    st.session_state.session_id = str(uuid.uuid4())
 
 role_avatar = {
     "assistant": "🦖",

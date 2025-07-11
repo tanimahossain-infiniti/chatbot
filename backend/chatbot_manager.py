@@ -1,19 +1,33 @@
 import os
+import logging
 from dotenv import load_dotenv
 
 from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
+from langchain.schema import Document
 
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 
+# Load environment variables
 load_dotenv()
 
+# Set up logging
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    filename="logs/chatbot.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+
+VECTOR_DB_TEXT_FILE = "data/vectordb.txt"
+
 class ChatbotManager:
-    def __init__(self, index_name="faiss_index_chatbot"):
+    def __init__(self, index_name="vector_index_chatbot"):
         self.index_name = index_name
         self.llm = OllamaLLM(model="llama3.2")
         self.embeddings = OllamaEmbeddings(model="llama3.2")
@@ -25,15 +39,45 @@ class ChatbotManager:
                 self.index_name, self.embeddings, allow_dangerous_deserialization=True
             )
 
-    def create_index(self, file_path="data/sample.txt"):
-        loader = TextLoader(file_path, encoding="utf-8")
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        docs = text_splitter.split_documents(documents)
-        
-        self.vectorstore = FAISS.from_documents(docs, self.embeddings)
-        self.vectorstore.save_local(self.index_name)
-        print(f"Vector store created and saved as {self.index_name}")
+    def create_index(self, file_path=VECTOR_DB_TEXT_FILE):
+        try:
+            if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write("Conversation History:\n")
+            loader = TextLoader(file_path, encoding="utf-8")
+            documents = loader.load()
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            docs = text_splitter.split_documents(documents)
+            
+            self.vectorstore = FAISS.from_documents(docs, self.embeddings)
+            self.vectorstore.save_local(self.index_name)
+            logging.info(f"Vector store created and saved as {self.index_name}")
+        except Exception as e:
+            logging.error(f"Error creating vector index: {str(e)}")
+
+    def save_answer_to_vector_db(self, question: str, answer: str, session_id: str):
+        """Save the AI's answer to the main vector database"""
+        try:
+            if self.vectorstore is None:
+                return
+            
+            # Create a document with the question-answer pair
+            doc_content = f"Question: {question}\nAnswer: {answer}"
+            doc = Document(
+                page_content=doc_content,
+                metadata={"session_id": session_id, "type": "qa_pair", "source": "chatbot_response"}
+            )
+            with open(VECTOR_DB_TEXT_FILE, "a", encoding="utf-8") as f:
+                f.write(f"\n{doc_content}\n")
+            
+            # Add to existing vector store
+            self.vectorstore.add_documents([doc])
+            
+            # Save the updated vector store
+            self.vectorstore.save_local(self.index_name)
+            logging.info(f"Answer saved to vector DB for session {session_id}")
+        except Exception as e:
+            logging.error(f"Error saving answer to vector DB: {str(e)}")
 
     def get_conversation_chain(self, session_id):
         if self.vectorstore is None:
@@ -59,11 +103,9 @@ Always try to:
 Document Context (use only if clearly relevant): 
 {context}
 
-
-
 Human: {question}
 Assistant:""",
-                input_variables=["context", "chat_history", "question"]
+                input_variables=["context", "question"]
             )
             
             self.conversations[session_id] = ConversationalRetrievalChain.from_llm(
@@ -79,6 +121,10 @@ Assistant:""",
         try:
             chain = self.get_conversation_chain(session_id)
             result = chain.invoke({"question": query})
-            return result.get("answer", "Sorry, I could not find an answer.")
+            answer = result.get("answer", "Sorry, I could not find an answer.")
+            
+            self.save_answer_to_vector_db(query, answer, session_id)
+            return answer
         except Exception as e:
+            logging.error(f"Error during chat: {str(e)}")
             return f"Sorry, I encountered an error: {str(e)}"
