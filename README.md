@@ -20,7 +20,7 @@ A sophisticated AI chatbot that uses vector embeddings to remember and learn fro
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Install Dependencies [not updated]
 
 ```bash
 # Backend dependencies
