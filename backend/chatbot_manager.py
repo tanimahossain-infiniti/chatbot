@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 
 from langchain.memory import ConversationBufferMemory
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
 from langchain.schema import Document
 
@@ -35,8 +35,9 @@ class ChatbotManager:
         self.conversations = {}
         self.vectorstore = None
         if os.path.exists(self.index_name):
-            self.vectorstore = FAISS.load_local(
-                self.index_name, self.embeddings, allow_dangerous_deserialization=True
+            self.vectorstore = Chroma(
+                persist_directory=self.index_name, 
+                embedding_function=self.embeddings
             )
 
     def create_index(self, file_path=VECTOR_DB_TEXT_FILE):
@@ -49,8 +50,12 @@ class ChatbotManager:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
             docs = text_splitter.split_documents(documents)
             
-            self.vectorstore = FAISS.from_documents(docs, self.embeddings)
-            self.vectorstore.save_local(self.index_name)
+            self.vectorstore = Chroma.from_documents(
+                docs, 
+                self.embeddings, 
+                persist_directory=self.index_name
+            )
+            self.vectorstore.persist()
             logging.info(f"Vector store created and saved as {self.index_name}")
         except Exception as e:
             logging.error(f"Error creating vector index: {str(e)}")
@@ -73,8 +78,8 @@ class ChatbotManager:
             # Add to existing vector store
             self.vectorstore.add_documents([doc])
             
-            # Save the updated vector store
-            self.vectorstore.save_local(self.index_name)
+            # Persist the updated vector store
+            self.vectorstore.persist()
             logging.info(f"Answer saved to vector DB for session {session_id}")
         except Exception as e:
             logging.error(f"Error saving answer to vector DB: {str(e)}")

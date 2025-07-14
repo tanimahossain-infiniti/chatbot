@@ -22,6 +22,7 @@ venv/
 .coverage
 
 # AI Chatbot specific
+vector_index_chatbot/
 vector_index.faiss
 metadata.pkl
 *.faiss
@@ -33,6 +34,12 @@ logs/
 *.log
 sessions/
 *.session
+
+# ChromaDB specific
+chroma.sqlite3
+*.sqlite3
+chroma_db/
+.chroma/
 
 # OS
 .DS_Store
